@@ -1,8 +1,5 @@
-# Runtime state for the bizrev harness
-.bizrev/state.json
-.bizrev/logs/
-.bizrev/ports/
-.bizrev/pids/
+# Runtime state for the bizrev harness — entire directory is local-only
+.bizrev/
 
 # Local secrets / env
 .env

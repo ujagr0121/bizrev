@@ -62,7 +62,17 @@ task_front_matter() {
   task_md="$BIZREV_REPO_ROOT/tasks/$id/task.md"
   [[ -f "$task_md" ]] || die "no task.md at $task_md"
   awk -v key="$key" '
-    function rtrim(s) { sub(/[[:space:]]+$/, "", s); return s }
+    function clean(s) {
+      sub(/[[:space:]]+$/, "", s)
+      # strip a single matching pair of surrounding double or single quotes
+      if (length(s) >= 2) {
+        first = substr(s, 1, 1); last = substr(s, length(s), 1)
+        if ((first == "\"" && last == "\"") || (first == "'\''" && last == "'\''")) {
+          s = substr(s, 2, length(s) - 2)
+        }
+      }
+      return s
+    }
     BEGIN { in_fm=0; parent="" }
     /^---[[:space:]]*$/ {
       if (!in_fm) { in_fm=1; next }
@@ -76,7 +86,7 @@ task_front_matter() {
         v = substr($0, idx+1)
         sub(/^[[:space:]]+/, "", v)
         parent = k
-        if (k == key) { print rtrim(v); exit }
+        if (k == key) { print clean(v); exit }
       }
       # nested "  subkey: value"
       else if ($0 ~ /^[[:space:]]+[A-Za-z_][A-Za-z0-9_]*:/) {
@@ -87,7 +97,7 @@ task_front_matter() {
         v = substr(line, idx+1)
         sub(/^[[:space:]]+/, "", v)
         compound = parent "." k
-        if (compound == key) { print rtrim(v); exit }
+        if (compound == key) { print clean(v); exit }
       }
     }
   ' "$task_md"
