@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# bizrev — top-level dispatcher for the development harness.
+#
+# Subcommands forward to scripts/<name>.sh. Everything else is handled here.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+  cat <<EOF
+bizrev — Claude-orchestrated, Codex-implemented development harness.
+
+Usage: bizrev <subcommand> [args]
+
+Planning / implementation:
+  task <new|list|show> ...         Manage task specs
+  implement <task-id>              Run codex exec for one task
+  parallel <task-id> ...           Run codex exec for several tasks concurrently
+  review <task-id> [--no-app]      Run acceptance + boot the dev server
+
+Worktrees & apps:
+  worktree <new|rm|list|path> ...  Git worktree management
+  app <up|down|status|url|logs>    Dev-server lifecycle
+
+Inspection:
+  status                           Cross-task dashboard
+  doctor                           Check prerequisites
+  help                             This message
+
+Environment knobs:
+  BIZREV_WORKTREE_ROOT   Where worktrees live (default: ../bizrev-worktrees)
+  BIZREV_PORT_BASE       First port to allocate (default: 8100)
+  BIZREV_CODEX_FLAGS     Extra flags passed to \`codex exec\`
+EOF
+}
+
+main() {
+  local cmd="${1:-help}"; shift || true
+  case "$cmd" in
+    task)        exec "$SCRIPT_DIR/task.sh" "$@" ;;
+    implement)
+      local id="${1:?task id required}"; shift || true
+      "$SCRIPT_DIR/worktree.sh" new "$id"
+      exec "$SCRIPT_DIR/codex-run.sh" "$id" "$@"
+      ;;
+    parallel)    exec "$SCRIPT_DIR/parallel.sh" "$@" ;;
+    review)      exec "$SCRIPT_DIR/review.sh" "$@" ;;
+    worktree)    exec "$SCRIPT_DIR/worktree.sh" "$@" ;;
+    app)         exec "$SCRIPT_DIR/app.sh" "$@" ;;
+    status)      exec "$SCRIPT_DIR/status.sh" "$@" ;;
+    doctor)      exec "$SCRIPT_DIR/doctor.sh" "$@" ;;
+    help|-h|--help) usage ;;
+    *) usage; exit 2 ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,46 @@
+# Runtime state for the bizrev harness
+.bizrev/state.json
+.bizrev/logs/
+.bizrev/ports/
+.bizrev/pids/
+
+# Local secrets / env
+.env
+.env.local
+.env.*.local
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+out/
+coverage/
+.turbo/
+
+# Worktree state files (the worktrees themselves live OUTSIDE this repo
+# at ../bizrev-worktrees/, so they're never tracked here, but local
+# scratch files inside a worktree shouldn't be tracked if a worktree
+# is ever placed inside.)
+.task-port
+.task-pid
+
+# Claude Code local
+.claude/settings.local.json
