@@ -20,6 +20,18 @@ worktrees.
 The boundary is deliberate: Claude owns _what and why_, Codex owns _how_, you
 own _ship it or not_.
 
+## Where Claude runs
+
+- **Claude on the web (claude.ai/code).** Use for planning, ADRs, doc work,
+  and reviewing pushed branches. Cannot run `codex exec` — Codex CLI is not
+  installed in cloud sessions and the default network allowlist doesn't
+  include the OpenAI API.
+- **Local Claude Code (terminal).** Use for `/implement`, `/parallel`, and
+  `/review` (the version that boots the dev server). Needs Codex CLI on
+  PATH and a working `OPENAI_API_KEY` / login.
+
+See `docs/workflow.md` ("Where to run what") for the per-command split.
+
 ## Repository layout
 
 ```

@@ -3,6 +3,31 @@
 How a feature actually gets built end-to-end. Skim once, then keep open while
 running the harness for the first time.
 
+## Where to run what
+
+The harness runs on whichever machine Claude Code (and Codex) is launched
+from. Claude Code on the web cannot run `codex exec` — Anthropic-managed
+cloud sessions don't install Codex CLI by default, the official `openai-codex`
+plugin is a client-side install, and the default network allowlist doesn't
+include the OpenAI API. So we split the loop:
+
+| Phase                | Where                  | Why                                                 |
+|----------------------|------------------------|-----------------------------------------------------|
+| `/plan`, `/adr`      | Claude on the web      | Pure design + doc work; no Codex needed             |
+| Reading review diffs | Claude on the web      | Reads pushed branches via GitHub MCP                |
+| `/implement <id>`    | **Local Claude Code**  | Needs `codex exec` and a real filesystem worktree   |
+| `/parallel <ids…>`   | **Local Claude Code**  | Same                                                |
+| `/review <id>` (boot the app) | **Local Claude Code** | Needs to bind a port + drive the dev server |
+| `/integrate <id>`    | Either                 | Git operation only                                  |
+
+In practice: open this repo in your terminal-side Claude Code for any task
+that touches a worktree, and use the web for everything upstream and
+downstream of that. Both sides see the same `tasks/` directory because it's
+versioned, so plans written on the web are immediately runnable locally.
+
+Prerequisites on the **local** side: see `README.md` quick-start. Run
+`./scripts/bizrev doctor` to verify Codex CLI is on PATH.
+
 ## TL;DR
 
 ```
