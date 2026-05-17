@@ -22,3 +22,4 @@ settle, will surprise a future contributor, or constrains future code.
 | 0003 | Task spec format                            | Accepted |
 | 0004 | App lifecycle via dev-server contract       | Accepted |
 | 0005 | Parallel execution via shell, not a daemon  | Accepted |
+| 0006 | Harness execution surface split             | Accepted |
