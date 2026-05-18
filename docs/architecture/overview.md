@@ -1,17 +1,17 @@
-# Architecture overview
+# アーキテクチャの概要 (Architecture overview)
 
-> Status: **draft**. Updated as ADRs are accepted. When in doubt, ADRs win.
+> ステータス: **ドラフト**。ADR が承認されるたびに更新されます。不確かな場合は ADR の決定が優先されます。
 
-## Top-level layout (target)
+## 最上位ディレクトリの構成（ターゲット）
 
 ```
-backend/                  FastAPI app, LangGraph workflows, agent prompts
+backend/                  FastAPI アプリ、LangGraph ワークフロー、エージェントプロンプト
   app/
-    api/                  HTTP routes
-    graph/                LangGraph nodes & edges
-    agents/               Per-specialist prompts + Pydantic schemas
-    db/                   Supabase client, migrations
-    tools/                Tavily wrapper, etc.
+    api/                  HTTP ルート（ルーティング）
+    graph/                LangGraph ノードとエッジ
+    agents/               専門スペシャリストごとのプロンプト + Pydantic スキーマ
+    db/                   Supabase クライアント、マイグレーション
+    tools/                Tavily ラッパーなど
   tests/
   pyproject.toml
 
@@ -21,15 +21,14 @@ frontend/                 Next.js (App Router) UI
   lib/
   package.json
 
-infra/                    Deploy config (Vercel + Render envs, Supabase SQL)
+infra/                    デプロイ設定（Vercel + Render 環境、Supabase SQL）
 
-docs/                     Specs, architecture, ADRs (this directory)
+docs/                     仕様書、アーキテクチャ、ADR（このディレクトリ）
 ```
 
-The directory tree above is **the target**, not what's on disk yet. The first
-implementation tasks build it incrementally — see `tasks/`.
+上記のディレクトリツリーは**ターゲット（目標構成）**であり、まだディスク上にすべてが存在するわけではありません。初期の実装タスクによって段階的に構築されます — `tasks/` を参照してください。
 
-## Runtime shape
+## ランタイムの構成 (Runtime shape)
 
 ```
 ┌────────────┐    REST     ┌──────────────────────────┐
@@ -48,41 +47,29 @@ implementation tasks build it incrementally — see `tasks/`.
                            └──────────────────────────┘
                                     │
                                     ▼
-                              Supabase (Postgres)
+                               Supabase (Postgres)
 ```
 
-- R: reception (idea → IdeaBrief).
-- P*: parallel specialists (competition, market, problem severity,
-  tech feasibility, monetization, regulatory).
-- I: integration + critical review.
-- V: vote (Human-in-the-loop interrupt; user clicks Go/Conditional/NoGo/Hold).
+- R: 受付 (Reception)（アイデア → IdeaBrief）。
+- P*: 並行処理スペシャリスト (Parallel specialists)（競合、市場、課題の深刻度、技術的実現可能性、マネタイズ、法規制）。
+- I: 統合 & クリティカルレビュー (Integration + critical review)。
+- V: 投票 (Vote)（Human-in-the-loop インタラプト。ユーザーが Go / Conditional（条件付きGo）/ NoGo / Hold をクリックする）。
 
-## Data contracts
+## データコントラクト (Data contracts)
 
-Every agent has a Pydantic model in `backend/app/agents/<name>/schema.py`.
-Models are exported as JSON Schema and shipped to the frontend's report
-renderer so the UI is data-driven (no per-agent hand-coded views).
+各エージェントは `backend/app/agents/<name>/schema.py` に Pydantic モデルを持ちます。これらのモデルは JSON スキーマとしてエクスポートされ、フロントエンドのレポートレンダラーに提供されるため、UI はデータ駆動型になります（エージェントごとの個別のビューをハードコーディングする必要はありません）。
 
-The reception agent's output (`IdeaBrief`) is the join point — every
-specialist consumes it. Treat its schema as a stable contract; changes go
-through an ADR.
+受付エージェントの出力（`IdeaBrief`）は結合点であり、すべてのスペシャリストがこれをコンシューム（消費）します。そのスキーマは安定したコントラクトとして扱い、変更は ADR を通す必要があります。
 
-## Cross-cutting concerns
+## 横断的関心事 (Cross-cutting concerns)
 
-- **Prompt caching.** System prompts share a cacheable prefix; per-agent
-  variation is appended. Verified via Anthropic's cache hit-rate logs.
-- **Cost routing.** Cheap extraction → GPT-4o-mini. Integration and
-  critical review → Claude Sonnet (latest). See ADR-0004 (to be written
-  when we pick exact model IDs).
-- **Iteration caps.** Every LangGraph node has `max_iterations = 3`. A
-  specialist that can't converge emits a low-confidence result rather than
-  looping.
-- **Observability.** Every agent run writes to a `runs` table keyed by
-  `(idea_id, agent, attempt)` with inputs, outputs, token counts, and
-  latency. The dashboard surfaces this as a per-idea audit trail.
+- **プロンプトキャッシュ。** システムプロンプトはキャッシュ可能なプレフィックスを共有し、エージェントごとのバリエーションは末尾に追加されます。これは Anthropic のキャッシュヒット率ログで検証されます。
+- **コストに応じたルーティング。** 安価な抽出タスク → GPT-4o-mini。統合およびクリティカルレビュー → Claude Sonnet（最新版）。ADR-0004 を参照（正確なモデル ID を決定した際に作成されます）。
+- **イテレーション上限。** すべての LangGraph ノードには `max_iterations = 3` が設定されています。収束しないスペシャリストは、ループし続けるのではなく、信頼度の低い結果を出力します。
+- **オブザーバビリティ（観察可能性）。** エージェントの実行ごとに、入力、出力、トークン数、レイテンシを含むログが `(idea_id, agent, attempt)` をキーとして `runs` テーブルに書き込まれます。ダッシュボードはこれをアイデアごとの監査トレイルとして表示します。
 
-## Open questions tracked elsewhere
+## 他で追跡されている未解決の質問 (Open questions tracked elsewhere)
 
-- Exact LLM models and version pinning → future ADR.
-- Auth (single-user MVP vs. multi-tenant) → future ADR.
-- Deployment target for FastAPI (Render vs. Fly.io vs. Lambda) → future ADR.
+- 正確な LLM モデルとバージョンの固定 → 将来の ADR
+- 認証（単一ユーザーの MVP か、マルチテナントか） → 将来の ADR
+- FastAPI のデプロイ先ターゲット（Render vs. Fly.io vs. Lambda） → 将来の ADR

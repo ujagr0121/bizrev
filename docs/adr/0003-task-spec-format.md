@@ -1,22 +1,18 @@
-# 0003 — Task spec format
+# 0003 — タスク仕様のフォーマット
 
-- **Status:** Accepted
-- **Date:** 2026-05-16
-- **Deciders:** project owner
+- **ステータス:** 承認済み (Accepted)
+- **日付:** 2026-05-16
+- **決定者:** プロジェクトオーナー (project owner)
 
-## Context
+## 背景 (Context)
 
-Codex needs a self-contained brief. The brief is also what humans audit when a
-task goes sideways. It must be writable in minutes by Claude, parseable by the
-harness (to extract metadata), and complete enough to implement against without
-chat backchannel.
+Codexは自己完結型の仕様概要（ブリーフ）を必要とします。この仕様概要は、タスクが難航した際に人間が監査する対象でもあります。Claudeが数分で記述でき、ハーネス（メタデータ抽出のため）が解析可能で、チャットによるやり取りなしで実装を完了できるほど十分に完全である必要があります。
 
-## Decision
+## 意思決定 (Decision)
 
-A task is a directory `tasks/<task-id>/` containing:
+タスクは、以下を含む `tasks/<task-id>/` ディレクトリとして構成されます：
 
-- `task.md` (**required**) — the brief. Front-matter YAML for machine fields,
-  Markdown body for the human brief. Schema:
+- `task.md` (**必須**) — タスクの概要。フロントマターは機械可読なYAML、ボディは人間向けのMarkdownで記述します。スキーマは以下の通りです：
 
   ```yaml
   ---
@@ -24,49 +20,40 @@ A task is a directory `tasks/<task-id>/` containing:
   title: Implement the competitor-analysis specialist
   status: ready          # ready | in-progress | review | merged | abandoned
   depends_on: [0001-ideabrief-schema]
-  paths:                 # files this task is allowed to touch
+  paths:                 # このタスクで変更が許可されるファイル
     - backend/app/agents/competitor/**
     - backend/tests/agents/test_competitor*.py
   app:
-    cmd: null            # or e.g. "make -C backend dev"
-    port: null           # or 8001
-    health: null         # or "http://localhost:8001/health"
+    cmd: null            # または "make -C backend dev" など
+    port: null           # または 8001
+    health: null         # または "http://localhost:8001/health"
   ---
   ```
 
-  Body sections:
-  - **Why** — link to spec/ADR, one paragraph of motivation.
-  - **What** — concrete deliverables (files, functions, endpoints).
-  - **Notes** — known gotchas, links to relevant code in other worktrees.
+  ボディの構成セクション：
+  - **Why** — 仕様書やADRへのリンク、モチベーションに関する1段落の説明。
+  - **What** — 具体的な成果物（ファイル、関数、エンドポイント）。
+  - **Notes** — 既知のはまりどころ、他のワークツリー内の関連コードへのリンク。
 
-- `acceptance.md` (**required**) — a checklist of executable commands.
-  Each item is `- [ ] description — \`shell command\``. The reviewer pastes
-  these into the worktree and confirms they all pass.
+- `acceptance.md` (**必須**) — 実行可能なコマンドのチェックリスト。
+  各項目は `- [ ] 説明 — \`シェルコマンド\`` の形式で記述します。レビュアーはこれを作業ツリー内で実行し、すべてがパスすることを確認します。
 
-- `codex.log` (auto, gitignored inside the task dir is fine) — appended by
-  the harness on each `codex exec` run.
+- `codex.log` (自動生成、タスクディレクトリ内でgit管理対象外にすることを推奨) — ハーネスが `codex exec` を実行するたびに追加されます。
 
-`task-id` is `NNNN-kebab-slug` where NNNN is a zero-padded sequence. The
-harness allocates the next number on `task new`.
+`task-id` は `NNNN-kebab-slug` 形式とし、NNNN はゼロ埋めされた連番です。ハーネスは `task new` の実行時に次の番号を自動で割り当てます。
 
-## Consequences
+## 結果 (Consequences)
 
-- `paths:` is enforceable — the reviewer can `git diff --name-only` against
-  it and reject a task that touches outside its lane. This is what makes
-  parallel work safe.
-- Tasks are reviewable as a unit even months later, because everything
-  needed to understand them is in the directory.
-- We accept the verbosity. A 5-line `task.md` is fine for trivial tasks —
-  the format scales down as well as up.
+- `paths:` の変更制限を強制できます — レビュアーは `git diff --name-only` を実行して、タスクが許可された範囲外のファイルを変更していないかを確認し、逸脱している場合は却下できます。これにより、並行作業の安全性が確保されます。
+- タスクを理解するために必要なすべての情報がディレクトリ内にまとまっているため、数ヶ月後でもタスク単位でのレビューが可能です。
+- 多少の記述量が増えることは許容します。些細なタスクであれば5行程度の `task.md` でも問題ありません — このフォーマットは規模の大小に応じて柔軟に対応できます。
 
-## Alternatives considered
+## 代替案の検討 (Alternatives considered)
 
-- **GitHub Issues only.** Rejected — works for tracking, but pulls humans
-  into a non-git surface for what should be a code-adjacent artifact.
-- **Inline in PR description.** Rejected — loses pre-implementation review,
-  and you can't depend on a PR description before the PR exists.
+- **GitHub Issuesのみ。** 却下 — トラッキングには適していますが、コードに隣接すべきアーティファクトであるにもかかわらず、人間をGit以外の場所での作業に巻き込んでしまうため。
+- **PRの説明文にインライン化する。** 却下 — 実装前のレビューができなくなり、かつPRが存在する前にPRの説明文に依存することはできないため。
 
-## References
+## 参照 (References)
 
 - `tasks/_template/`
 - `scripts/bizrev task new`

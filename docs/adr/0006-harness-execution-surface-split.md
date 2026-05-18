@@ -1,67 +1,39 @@
-# 0006 — Split harness execution across web and local surfaces
+# 0006 — Webとローカル環境間でのハーネス実行の分割
 
-- **Status:** Accepted
-- **Date:** 2026-05-17
-- **Deciders:** project maintainer
+- **ステータス:** 承認済み (Accepted)
+- **日付:** 2026-05-17
+- **決定者:** プロジェクトメンテナー (project maintainer)
 
-## Context
+## 背景 (Context)
 
-The bizrev harness uses two distinct Claude Code surfaces: the Anthropic-managed
-cloud (claude.ai/code) and a locally installed Claude Code terminal session. As
-the harness commands were assigned to one surface or the other, three hard
-constraints emerged:
+bizrev ハーネスは、2つの異なる Claude Code 環境を使用します：Anthropic が管理するクラウド環境 (claude.ai/code) と、ローカルにインストールされた Claude Code ターミナルセッションです。ハーネスのコマンドをいずれかの環境に割り当てるにあたり、3つの強力な制約が明らかになりました：
 
-1. Cloud sessions do not ship the Codex CLI, and the default network allowlist
-   does not include the OpenAI API endpoints Codex requires, so `codex exec`
-   cannot run there even if the binary were installed.
-2. The worktree model (`../bizrev-worktrees/<task-id>` on branch
-   `task/<task-id>`) requires a persistent filesystem the user can also `cd`
-   into. Cloud containers are ephemeral and isolated from the user's machine.
-3. `/review` boots the task's dev server (`task.app.cmd`) and reports a URL the
-   user must be able to reach — that only works when the server runs on the
-   user's local machine.
+1. クラウドセッションには Codex CLI が同梱されておらず、デフォルトのネットワーク許可リストには Codex が必要とする OpenAI API エンドポイントが含まれていません。そのため、バイナリがインストールされていたとしても、そこで `codex exec` を実行することはできません。
+2. ワークツリーモデル（ブランチ `task/<task-id>` 上の `../bizrev-worktrees/<task-id>`）は、ユーザーが `cd` で入ることもできる永続的なファイルシステムを必要とします。クラウドコンテナは一時的（エフェメラル）であり、ユーザーのローカルマシンから隔離されています。
+3. `/review` はタスクの開発サーバー (`task.app.cmd`) を起動し、ユーザーがアクセス可能な URL を報告します — これはサーバーがユーザーのローカルマシン上で実行されている場合にのみ機能します。
 
-The per-command split is already documented in `docs/workflow.md` (section
-"Where to run what") and `README.md` (section "Where Claude runs"), but those
-are prose guides. This ADR exists so the split has a citable record and future
-contributors do not attempt to wire Codex into web sessions.
+コマンドごとの分割は、すでに `docs/workflow.md`（「どこで何を実行するか」セクション）および `README.md`（「Claudeが動作する場所」セクション）のドキュメントに記載されていますが、これらはテキストによるガイドに過ぎません。この ADR は、この分割に引用可能な記録を残し、将来のコントリビューターが Web セッションに Codex を組み込もうとするのを防ぐために作成されました。
 
-## Decision
+## 意思決定 (Decision)
 
-We will formally assign harness commands to execution surfaces: `/plan`, `/adr`,
-doc work, and async diff review of pushed branches run on the web; `/implement`,
-`/parallel`, and `/review` (dev-server-booting) run locally; `/integrate` works
-on either surface.
+ハーネスのコマンドを実行環境に対して正式に割り当てます：`/plan`、`/adr`、ドキュメント作成作業、およびプッシュされたブランチの非同期差分レビューは Web 上で実行します。`/implement`、`/parallel`、および `/review`（開発サーバーの起動を伴うもの）はローカルで実行します。`/integrate` はいずれの環境でも動作します。
 
-## Consequences
+## 結果 (Consequences)
 
-- Tasks authored on the web are immediately runnable locally because `tasks/` is
-  version-controlled — both sides share the same task directory once pushed.
-- Contributors must have a local environment with Codex CLI installed and
-  `OPENAI_API_KEY` set for the implementer phase; `scripts/bizrev doctor`
-  verifies this.
-- The round-trip is: design on the web → push → `git pull` locally →
-  `/implement` → push task branch → review diff on the web. The web side never
-  blocks on a Codex run.
-- If cloud sessions gain Codex CLI support and the OpenAI allowlist is relaxed,
-  this ADR should be superseded by one that re-enables `/implement` on the web.
+- Web 上で作成されたタスクは、`tasks/` がバージョン管理されているため、プッシュされればすぐにローカルで実行可能です — プッシュされた後は両者で同じタスクディレクトリを共有します。
+- コントリビューターは、実装フェーズのために Codex CLI がインストールされ、`OPENAI_API_KEY` が設定されたローカル環境を用意する必要があります。これは `scripts/bizrev doctor` で検証されます。
+- 一連の作業サイクルは次のようになります：Web 上で設計 → プッシュ → ローカルで `git pull` → `/implement` → タスクブランチをプッシュ → Web 上で差分をレビュー。Web 側が Codex の実行でブロックされることはありません。
+- クラウドセッションが Codex CLI をサポートし、OpenAI の許可リストが緩和された場合、この ADR は Web 上での `/implement` を再有効化する新しい ADR によって上書きされるべきです。
 
-## Alternatives considered
+## 代替案の検討 (Alternatives considered)
 
-- **Codex-everywhere via a self-hosted relay** — a small service the web session
-  calls that runs Codex on a private VM. Rejected: adds infrastructure to
-  maintain, an auth surface, and a new failure mode for a single-developer
-  harness. Revisit if the team grows.
-- **Skip Codex; let Claude write production code** — rejected: directly
-  contradicts the role boundary in `CLAUDE.md` and ADR 0001. The Claude→Codex
-  split exists so design and implementation are reviewable as separate artifacts.
-- **Local-only harness** — rejected: the web surface is genuinely useful for
-  planning, ADR writing, and async review of pushed branches; removing it would
-  slow design iteration without benefit.
+- **セルフホスト型リレーによる Codex のユビキタス化（どこでも実行可能にすること）** — プライベート VM 上で Codex を実行し、Web セッションから呼び出すための小さなリレーサービス。却下：維持すべきインフラ、認証面、および単一開発者向けハーネスにおける新たな障害モードが増えるため。チームが拡大した際に再検討します。
+- **Codex をスキップして Claude にプロダクションコードを書かせる** — 却下：`CLAUDE.md` および ADR-0001 における役割の境界に直接矛盾するため。Claude と Codex の分割は、設計と実装を別々のアーティファクトとしてレビュー可能にするために存在します。
+- **Local-only harness** — 却下：Web 環境は計画、ADR の作成、プッシュされたブランチの非同期レビューに非常に有用であり、これを排除することは設計のイテレーションを無駄に遅らせるだけだからです。
 
-## References
+## 参照 (References)
 
-- ADR 0001 — Claude designs, Codex implements
-- `docs/workflow.md` — "Where to run what" table
-- `README.md` — "Where Claude runs"
-- Commit `5d8db51` on branch `claude/setup-ai-agent-infrastructure-x2q2Z`
+- ADR 0001 — Claudeが設計し、Codexが実装する
+- `docs/workflow.md` — 「どこで何を実行するか」の表
+- `README.md` — 「Claudeが動作する場所」
+- ブランチ `claude/setup-ai-agent-infrastructure-x2q2Z` 上のコミット `5d8db51`

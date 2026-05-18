@@ -1,51 +1,42 @@
-# 0005 — Parallel execution via shell, not a daemon
+# 0005 — デーモンではなくシェルを介した並行実行
 
-- **Status:** Accepted
-- **Date:** 2026-05-16
-- **Deciders:** project owner
+- **ステータス:** 承認済み (Accepted)
+- **日付:** 2026-05-16
+- **決定者:** プロジェクトオーナー (project owner)
 
-## Context
+## 背景 (Context)
 
-The harness needs to run several `codex exec` tasks at once. Options:
+ハーネスは、複数の `codex exec` タスクを同時に実行する必要があります。選択肢：
 
-1. A long-running coordinator daemon (Python service, queue, workers).
-2. A shell-level approach: each task is a backgrounded subprocess managed by
-   files under `.bizrev/`.
-3. A workflow engine (Temporal, Prefect).
+1. 長寿命のコーディネーターデーモン（Python サービス、キュー、ワーカー）。
+2. シェルレベルのアプローチ：各タスクを `.bizrev/` 配下のファイルで管理されるバックグラウンドのサブプロセスとする。
+3. ワークフローエンジン（Temporal、Prefect）。
 
-We're a single-developer build at MVP. We need parallelism, not durability or
-distributed scheduling.
+私たちは MVP 段階の個人開発者向けビルドを行っています。必要なのは並行処理であり、堅牢性（耐久性）や分散スケジューリングではありません。
 
-## Decision
+## 意思決定 (Decision)
 
-Parallel execution is implemented in shell. `scripts/bizrev parallel <ids...>`
-forks one `codex exec` per task id (each in its own worktree) and waits for
-all of them. State is captured in plain files:
+並行実行はシェルで実装します。`scripts/bizrev parallel <ids...>` は、タスク ID ごとに1つの `codex exec` をフォークし（それぞれ独自のワークツリー内で実行）、すべての処理の完了を待ちます。状態はプレーンなファイルにキャプチャされます：
 
-- `.bizrev/pids/<id>.pid` — running pid.
-- `.bizrev/logs/<id>.log` — combined stdout/stderr.
-- `.bizrev/state.json` — last known status per task (updated atomically with
-  `flock`).
+- `.bizrev/pids/<id>.pid` — 実行中の PID。
+- `.bizrev/logs/<id>.log` — 標準出力/標準エラー出力を結合したログ。
+- `.bizrev/state.json` — タスクごとの最新の既知のステータス（`flock` でアトミックに更新）。
 
-There is no daemon; there is no socket. Killing a `bizrev parallel` invocation
-SIGTERMs the children.
+デーモンやソケットは存在しません。`bizrev parallel` の起動プロセスをキルすると、子プロセスに SIGTERM が送信されます。
 
-## Consequences
+## 結果 (Consequences)
 
-- Trivial to operate: `ps`, `tail -f`, `kill`.
-- Crash-recoverable: state lives on disk; a new `bizrev status` reads the
-  same files.
-- We accept that we can't survive a host reboot mid-run — tasks would need
-  to be re-kicked. That's fine for personal-scale work.
-- If we ever need multi-host scheduling, we replace `scripts/parallel.sh`
-  with a real queue and leave the rest of the harness alone.
+- 運用が極めて容易です：`ps`、`tail -f`、`kill` で管理できます。
+- クラッシュからの復旧が可能：状態はディスク上に存在するため、新しく `bizrev status` を実行すると同じファイルを読み込みます。
+- 実行中のホストの再起動には耐えられないという制限を受け入れます（再起動した場合はタスクを再起動する必要があります）。これは個人規模の作業としては十分です。
+- 将来的に複数ホストでのスケジューリングが必要になった場合は、残りのハーネスには手を加えず、`scripts/parallel.sh` のみを本物のキューシステムに置き換えます。
 
-## Alternatives considered
+## 代替案の検討 (Alternatives considered)
 
-- **Daemon.** Rejected — too much surface area for current needs.
-- **Workflow engine.** Rejected — same reason; revisit if we go SaaS.
+- **デーモン。** 却下 — 現在のニーズに対してフットプリント（開発対象）が大きすぎるため。
+- **ワークフローエンジン。** 却下 — 同上の理由。SaaS化する際に再検討します。
 
-## References
+## 参照 (References)
 
 - `scripts/parallel.sh`
 - `scripts/lib/common.sh`

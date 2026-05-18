@@ -1,158 +1,131 @@
-# Development workflow
+# 開発ワークフロー
 
-How a feature actually gets built end-to-end. Skim once, then keep open while
-running the harness for the first time.
+機能が実際にエンドツーエンドでどのように構築されるかを示します。まず一読し、ハーネスを初めて実行する間は開いたままにしてください。
 
-## Where to run what
+## どこで何を実行するか
 
-The harness runs on whichever machine Claude Code (and Codex) is launched
-from. Claude Code on the web cannot run `codex exec` — Anthropic-managed
-cloud sessions don't install Codex CLI by default, the official `openai-codex`
-plugin is a client-side install, and the default network allowlist doesn't
-include the OpenAI API. So we split the loop:
+ハーネスは、Claude Code (および Codex) が起動されたマシン上で動作します。Web 版 of Claude Code では `codex exec` を実行できません。Anthropic が管理するクラウドセッションには、デフォルトで Codex CLI がインストールされておらず、公式の `openai-codex` プラグインはクライアントサイドでのインストールが必要であり、デフォルトのネットワーク許可リストには OpenAI API が含まれていません。そのため、ループを以下のように分割します：
 
-| Phase                | Where                  | Why                                                 |
-|----------------------|------------------------|-----------------------------------------------------|
-| `/plan`, `/adr`      | Claude on the web      | Pure design + doc work; no Codex needed             |
-| Reading review diffs | Claude on the web      | Reads pushed branches via GitHub MCP                |
-| `/implement <id>`    | **Local Claude Code**  | Needs `codex exec` and a real filesystem worktree   |
-| `/parallel <ids…>`   | **Local Claude Code**  | Same                                                |
-| `/review <id>` (boot the app) | **Local Claude Code** | Needs to bind a port + drive the dev server |
-| `/integrate <id>`    | Either                 | Git operation only                                  |
+| フェーズ | 実行場所 | 理由 |
+|---|---|---|
+| `/plan`, `/adr` | Web 版の Claude | 純粋な設計とドキュメント作成作業。Codex は不要。 |
+| レビュー差分の読み込み | Web 版の Claude | GitHub MCP 経由でプッシュされたブランチを読み込みます。 |
+| `/implement <id>` | **ローカルの Claude Code** | `codex exec` と実際のファイルシステム上のワークツリーが必要です。 |
+| `/parallel <ids…>` | **ローカルの Claude Code** | 同上。 |
+| `/review <id>` (アプリ起動) | **ローカルの Claude Code** | ポートのバインドと開発サーバーの制御が必要です。 |
+| `/integrate <id>` | どちらでも | Git 操作のみ。 |
 
-In practice: open this repo in your terminal-side Claude Code for any task
-that touches a worktree, and use the web for everything upstream and
-downstream of that. Both sides see the same `tasks/` directory because it's
-versioned, so plans written on the web are immediately runnable locally.
+実際の運用：ワークツリーを操作するタスクでは、ターミナル側のローカル Claude Code でこのリポジトリを開き、それより上流および下流の作業には Web 版を使用します。どちらの側もバージョン管理された `tasks/` ディレクトリを参照するため、Web で作成されたプランはローカルですぐに実行可能です。
 
-Prerequisites on the **local** side: see `README.md` quick-start. Run
-`./scripts/bizrev doctor` to verify Codex CLI is on PATH.
+**ローカル**側の前提条件：`README.md` のクイックスタートを参照してください。`./scripts/bizrev doctor` を実行して、Codex CLI が PATH に通っているか確認してください。
 
-## TL;DR
+## 要約 (TL;DR)
 
 ```
-idea ──► Claude /plan ──► tasks/<id>/ ──► /implement ──► worktree+Codex
-                                                  │
-                                                  ▼
-                                       /review (boots app)
-                                                  │
-                                  ┌────── Go ─────┴───── NoGo ──────┐
-                                  ▼                                  ▼
-                            /integrate                          rework task
+アイデア ──► Claude /plan ──► tasks/<id>/ ──► /implement ──► ワークツリー+Codex
+                                                   │
+                                                   ▼
+                                        /review (アプリ起動)
+                                                   │
+                                   ┌────── OK ─────┴───── NG ──────┐
+                                   ▼                               ▼
+                             /integrate                       タスクのやり直し
 ```
 
-## 1. Plan
+## 1. 計画 (Plan)
 
 ```
-You:     "Add the competitor-analysis specialist."
+ユーザー: "競合分析のスペシャリストを追加して。"
 Claude:  /plan competitor-analysis
 ```
 
-The `planner` subagent decomposes the request into one or more task
-directories under `tasks/`. Each gets a numeric id (`NNNN-slug`), a brief, an
-acceptance checklist, and `paths:` declaring which files it owns. The plan
-itself ends with a one-line summary committed on the main branch:
+`planner` サブエージェントは、リクエストを `tasks/` 以下の1つ以上のタスクディレクトリに分解します。それぞれに数値 ID (`NNNN-slug`)、概要、受け入れチェックリスト、および所有するファイルを宣言する `paths:` が割り当てられます。計画自体は、メインブランチにコミットされた1行の概要で終了します：
 
 ```
 chore(plan): add tasks 0007–0009 (competitor agent)
 ```
 
-If two tasks are independent (`paths:` don't overlap), the plan flags them as
-parallel-safe.
+2つのタスクが独立している場合（`paths:` が重複しない場合）、計画はそれらを並行実行可能（parallel-safe）としてマークします。
 
-## 2. Implement
+## 2. 実装 (Implement)
 
 ```
 Claude:  /implement 0007-competitor-agent
 ```
 
-This calls `scripts/bizrev implement 0007-competitor-agent`, which:
+これは `scripts/bizrev implement 0007-competitor-agent` を呼び出し、以下の処理を行います：
 
-1. Ensures a worktree at `../bizrev-worktrees/0007-competitor-agent/` exists
-   on branch `task/0007-competitor-agent`, branched from `main`.
-2. Builds the Codex prompt from `tasks/0007-competitor-agent/task.md`,
-   `acceptance.md`, the repo `AGENTS.md`, and the listed `depends_on` task
-   summaries.
-3. Runs `codex exec --cd <worktree> <prompt>`, streaming output to
-   `.bizrev/logs/0007-competitor-agent.log`.
-4. On exit, commits any unstaged Codex changes with `chore(codex): wip` so
-   nothing is lost, then prints next-step hints.
+1. `main` から分岐したブランチ `task/0007-competitor-agent` 上の `../bizrev-worktrees/0007-competitor-agent/` にワークツリーが存在することを確認します。
+2. `tasks/0007-competitor-agent/task.md`、`acceptance.md`、リポジトリの `AGENTS.md`、および依存するタスクの概要から Codex プロンプトを構築します。
+3. `codex exec --cd <worktree> <prompt>` を実行し、出力を `.bizrev/logs/0007-competitor-agent.log` にストリーミングします。
+4. 終了時に、未ステージの Codex 変更を `chore(codex): wip` としてコミットし、変更が失われないようにした上で、次のステップのヒントを出力します。
 
-For parallel work:
+並行作業の場合：
 
 ```
 Claude:  /parallel 0007 0008 0009
 ```
 
-Equivalent to three `/implement` runs but spawned concurrently.
+これは3つの `/implement` を実行するのと同等ですが、並行して起動されます。
 
-## 3. Review
+## 3. レビュー (Review)
 
 ```
-You:     "Ready to review 0007?"
+ユーザー: "0007をレビューする準備はできた？"
 Claude:  /review 0007-competitor-agent
 ```
 
-The `reviewer` subagent:
+`reviewer` サブエージェントは：
 
-1. Runs `scripts/bizrev review 0007-competitor-agent`, which:
-   a. Runs the acceptance commands from `acceptance.md`.
-   b. If `app.cmd` is set, boots the dev server via `scripts/bizrev app up`.
-   c. Prints the URL and waits.
-2. Summarizes the diff against `main` with focus on `paths:` adherence,
-   tests added, risks, and any `NOTES:` block Codex emitted.
-3. Hands back to you with: green checks, the app URL, and the questions
-   needing your judgment.
+1. `scripts/bizrev review 0007-competitor-agent` を実行します。これは：
+   a. `acceptance.md` から受け入れコマンドを実行します。
+   b. `app.cmd` が設定されている場合、`scripts/bizrev app up` を介して開発サーバーを起動します。
+   c. URL を出力して待機します。
+2. `paths:` への準拠、追加されたテスト、リスク、および Codex が出力した `NOTES:` ブロックに焦点を当てて、`main` に対する差分を要約します。
+3. 緑色のチェックマーク、アプリの URL、およびユーザーの判断が必要な質問を添えて、あなたに引き渡します。
 
-If the diff strays outside `paths:`, the review fails fast — that's a planner
-bug, not a Codex bug.
+差分が `paths:` の範囲外に及んでいる場合、レビューは即座に失敗します。これは Codex のバグではなく、プランナーのバグです。
 
-## 4. Integrate
+## 4. 統合 (Integrate)
 
 ```
-You:     "Merge it."
+ユーザー: "マージして。"
 Claude:  /integrate 0007-competitor-agent
 ```
 
-The `integrator` subagent fast-forwards or merges `task/0007-competitor-agent`
-into `main` (squash by default), pushes, and tears down the worktree and the
-running app. The task directory stays in git history; `tasks/<id>/task.md`'s
-`status` is bumped to `merged`.
+`integrator` サブエージェントは、`task/0007-competitor-agent` を `main` にファストフォワードまたはマージ（デフォルトはスクワッシュ）し、プッシュして、ワークツリーと実行中のアプリをクリーンアップします。タスクディレクトリは git 履歴に残ります。`tasks/<id>/task.md` の `status` は `merged` に更新されます。
 
-## 5. Capture decisions
+## 5. 決定事項の記録 (Capture decisions)
 
-If anything during plan/implement/review surfaced a non-obvious decision:
+計画/実装/レビュー中に自明ではない決定事項が生じた場合：
 
 ```
 Claude:  /adr "route GPT-4o-mini for competitor extraction, Sonnet for review"
 ```
 
-The `adr-writer` agent creates the next-numbered ADR with status `Accepted`
-and links it from the task and (if relevant) `docs/architecture/overview.md`.
+`adr-writer` エージェントは、ステータスを `Accepted` とした新しい連番の ADR を作成し、タスクおよび関連する場合は `docs/architecture/overview.md` からリンクします。
 
-## Day-to-day commands
+## 日常コマンド
 
 ```bash
-scripts/bizrev doctor              # prerequisites check
-scripts/bizrev task new <slug>     # scaffold tasks/<NNNN-slug>/
-scripts/bizrev implement <id>      # delegate to Codex in a worktree
-scripts/bizrev parallel <id> ...   # several at once
-scripts/bizrev review <id>         # run acceptance + boot app
-scripts/bizrev app up <id>         # just the app
-scripts/bizrev app down <id>
-scripts/bizrev app status
-scripts/bizrev worktree list
-scripts/bizrev worktree rm <id>
-scripts/bizrev status              # cross-task dashboard
+scripts/bizrev doctor              # 前提条件のチェック
+scripts/bizrev task new <slug>     # tasks/<NNNN-slug>/ の雛形作成
+scripts/bizrev implement <id>      # ワークツリー内でCodexに処理を委譲
+scripts/bizrev parallel <id> ...   # 複数のタスクを同時に実行
+scripts/bizrev review <id>         # 受け入れ確認の実行 + アプリの起動
+scripts/bizrev app up <id>         # アプリのみ起動
+scripts/bizrev app down <id>       # アプリの停止
+scripts/bizrev app status          # アプリの状態確認
+scripts/bizrev worktree list       # ワークツリー一覧
+scripts/bizrev worktree rm <id>    # ワークツリーの削除
+scripts/bizrev status              # クロスタスクダッシュボードの表示
 ```
 
-Inside Claude Code, prefer the slash commands (`/plan`, `/implement`, ...) —
-they wire in the right subagent and contextual prompts.
+Claude Code 内部では、スラッシュコマンド (`/plan`, `/implement` など) を優先して使用してください。これらは適切なサブエージェントとコンテキストプロンプトを自動的に適用します。
 
-## What lives where
+## 配置されるファイルとディレクトリ
 
-- `tasks/<id>/` — the brief. Versioned.
-- `../bizrev-worktrees/<id>/` — the working tree. Not versioned in this repo
-  (it's a separate working copy of the same `.git`).
-- `.bizrev/` — runtime state (pids, logs, port assignments). Gitignored.
-- `docs/adr/` — decisions. Immutable history.
+- `tasks/<id>/` — タスク概要。バージョン管理対象。
+- `../bizrev-worktrees/<id>/` — 作業ツリー。このリポジトリ内ではバージョン管理対象外（同じ `.git` の別作業コピー）。
+- `.bizrev/` — ランタイム状態（PID、ログ、ポート割り当て）。Git 管理対象外（gitignore）。
+- `docs/adr/` — 決定事項。不変の履歴。
