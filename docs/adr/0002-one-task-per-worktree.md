@@ -1,52 +1,43 @@
-# 0002 — One task per git worktree
+# 0002 — 1つのgitワークツリーにつき1つのタスク
 
-- **Status:** Accepted
-- **Date:** 2026-05-16
-- **Deciders:** project owner
+- **ステータス:** 承認済み (Accepted)
+- **日付:** 2026-05-16
+- **決定者:** プロジェクトオーナー (project owner)
 
-## Context
+## 背景 (Context)
 
-We want to run multiple Codex implementations in parallel (e.g. the
-competitor-agent and the market-sizing-agent at the same time). They must not
-collide in the working tree, and we still want one canonical repository on
-disk.
+複数のCodex実装を並行して実行したいと考えています（例：competitor-agent と market-sizing-agent を同時に実行）。それらが作業ツリー内で衝突してはならず、かつディスク上には1つの正規のリポジトリのみを維持したいと考えています。
 
-Options for isolation:
-1. Multiple full clones of the repo.
-2. Long-running feature branches in a single working tree (serial only).
-3. Git worktrees, one per task.
-4. Container-per-task with a bind-mounted clone.
+分離（アイソレーション）のための選択肢：
+1. リポジトリの完全なクローンを複数作成する。
+2. 単一の作業ツリーで長寿命のフィーチャーブランチを使用する（直列実行のみ）。
+3. タスクごとに git worktree を使用する。
+4. バインドマウントされたクローンを持つタスクごとのコンテナ。
 
-## Decision
+## 意思決定 (Decision)
 
-We use **git worktrees, one per task**, created and managed by the harness:
+ハーネスによって作成および管理される、**タスクごとに1つの git worktree** を使用します：
 
-- Worktrees live at `../bizrev-worktrees/<task-id>/`, outside the main repo.
-- Each worktree is on branch `task/<task-id>`, branched from `main`
-  (or from a designated integration branch).
-- The harness owns creation (`scripts/bizrev worktree new <id>`) and cleanup
-  (`scripts/bizrev worktree rm <id>`); humans don't run raw `git worktree`.
-- Concurrent tasks must touch disjoint file paths — the planner enforces this
-  when splitting work.
+- ワークツリーは、メインリポジトリの外側である `../bizrev-worktrees/<task-id>/` に配置されます。
+- 各ワークツリーは `main`（または指定された統合ブランチ）から分岐したブランチ `task/<task-id>` 上に存在します。
+- ハーネスが作成 (`scripts/bizrev worktree new <id>`) とクリーンアップ (`scripts/bizrev worktree rm <id>`) を所有します。人間が直接 raw な `git worktree` コマンドを実行することはありません。
+- 並行タスクは互いに重複しないファイルパスを操作する必要があります — プランナーが作業を分割する際にこれを強制します。
 
-## Consequences
+## 結果 (Consequences)
 
-- Disk usage stays low: shared `.git` directory across all worktrees.
-- A Codex run cannot accidentally clobber another's edits.
-- App lifecycle (ADR-0004) cleanly maps to "one app per worktree, one port."
-- Merging is normal `git merge`/PR flow; no special tooling needed.
-- We accept the limitation that submodules are awkward in worktrees — we
-  don't plan to use submodules.
+- ディスク使用量を低く抑えることができます：すべてのワークツリーで `.git` ディレクトリが共有されます。
+- ある Codex の実行が、別の Codex の編集内容を誤って上書きすることはありません。
+- アプリのライフサイクル（ADR-0004）が、「1つのワークツリーにつき1つのアプリ、1つのポート」に明確にマッピングされます。
+- マージは通常の `git merge`/PR フローであり、特別なツールは不要です。
+- ワークツリー内でのサブモジュールの扱いが不便であるという制限を受け入れます — サブモジュールを使用する予定はありません。
 
-## Alternatives considered
+## 代替案の検討 (Alternatives considered)
 
-- **Multiple clones.** Rejected — wastes disk, drifts on `git config`.
-- **Serial single-branch.** Rejected — kills the parallel-execution goal.
-- **Container per task.** Rejected — adds an order of magnitude of setup
-  complexity for a personal-build MVP. We may revisit when we want hermetic
-  CI for tasks.
+- **複数のクローン。** 却下 — ディスク容量を浪費し、`git config` が乖離するため。
+- **直列の単一ブランチ。** 却下 — 並行実行という目標を損なうため。
+- **タスクごとのコンテナ。** 却下 — 個人向けの MVP にとってはセットアップの複雑さが桁違いに増すため。タスク用の密閉された（hermetic）CIが必要になった際に再検討する可能性があります。
 
-## References
+## 参照 (References)
 
 - `scripts/worktree.sh`
 - https://git-scm.com/docs/git-worktree

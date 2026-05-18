@@ -1,69 +1,52 @@
-# Product brief — bizrev
+# プロダクト概要 — bizrev
 
-> Source of truth: Google Doc "新規ビジネスアイデア実現性評価AIエージェントチーム 設計検討資料"
-> (id `1yqtPUGXNqxSaefkcGjxRYJkXu9Co34-iDF2m0bT8MQI`). This file mirrors the
-> doc; when they diverge, the Google Doc wins and this file is re-mirrored.
+> 信頼できる情報源 (Source of Truth): Google ドキュメント「新規ビジネスアイデア実現性評価AIエージェントチーム 設計検討資料」
+> (ID `1yqtPUGXNqxSaefkcGjxRYJkXu9Co34-iDF2m0bT8MQI`)。このファイルは Google ドキュメントの内容を反映したものです。内容に乖離が生じた場合は Google ドキュメントが優先され、このファイルは再反映されます。
 
-## 1. Executive summary
+## 1. エグゼクティブサマリー
 
-Build an "AI agent team" that takes a business idea (unstructured text, a few
-sentences to a few hundred characters) and produces a structured Go / Conditional
-Go / NoGo / Hold recommendation for the human owner.
+ビジネスアイデア（数文から数百文字程度の非構造化テキスト）を入力とし、人間のオーナーに対して構造化された「Go / Conditional Go（条件付きGo）/ NoGo / Hold」の推奨決定を生成する「AIエージェントチーム」を構築します。
 
-Not a "sparring partner" chatbot — a **deterministic workflow** in which LLMs
-are workers inside a state machine. Agent-to-agent communication is
-**structured JSON** (Pydantic / JSON Schema), and a human-in-the-loop sign-off
-gate is built in.
+単なる「相談相手（スパーリングパートナー）」のチャットボットではなく、LLM を状態機械（ステートマシン）内のワーカーとして機能させる**決定論的ワークフロー**です。エージェント間の通信は**構造化された JSON** (Pydantic / JSON Schema) で行われ、人間の承認（Human-in-the-loop）ゲートが組み込まれています。
 
-Scope: a personal-build MVP shippable in 1–2 weeks, with an explicit extension
-path toward an enterprise version (GitHub Projects integration, RAG over past
-NoGo'd ideas, etc.).
+スコープ：1〜2週間で提供可能な個人開発向け MVP。将来のエンタープライズ版（GitHub Projects との連携、過去の NoGo アイデアに対する RAG など）への明確な拡張パスを備えています。
 
-### Assumptions
+### 前提条件 (Assumptions)
 
-- Initial input: a few sentences to a few hundred characters of free text.
-- Backend: Python (FastAPI) for orchestration; talks to the frontend over REST.
-- Frontend: Next.js.
-- Infra: serverless / PaaS for cost and ops (Vercel, Supabase, Render).
+- 初期入力：数文から数百文字程度の自由形式のテキスト。
+- バックエンド：オーケストレーション用の Python (FastAPI)。REST を介してフロントエンドと通信。
+- フロントエンド：Next.js。
+- インフラ：コストと運用のためのサーバーレス / PaaS（Vercel、Supabase、Render）。
 
-## 2. System overview
+## 2. システムの概要 (System overview)
 
-The system is a state machine; LLMs are pipeline workers, control flow is
-deterministic code.
+システムは状態機械（ステートマシン）です。LLM はパイプラインのワーカーであり、制御フローは決定論的なコードです。
 
-1. **Input phase** — user enters an idea. A reception agent may ask 1–2
-   clarifying questions.
-2. **Structuring phase** — reception agent converts the idea to an
-   `IdeaBrief` JSON document; this is persisted in the DB.
-3. **Investigation phase** — specialist agents read the brief and run their
-   own analysis (web search via Tavily, etc.), each emitting a typed JSON
-   output. Agents run in parallel where dependencies allow.
-4. **Integration & audit phase** — an integration agent aggregates the
-   results, then a critical-reviewer agent audits for optimism bias and
-   logical leaps.
-5. **Decision phase** — user reviews the dashboard and chooses Go /
-   Conditional Go / NoGo / Hold.
-6. **Action phase** — on Go, the system files initial implementation tasks
-   into a project tracker (GitHub Projects V2 later).
+1. **入力フェーズ** — ユーザーがアイデアを入力します。受付エージェントが 1〜2 の明確化のための質問を行う場合があります。
+2. **構造化フェーズ** — 受付エージェントがアイデアを `IdeaBrief` JSON ドキュメントに変換し、データベースに永続化します。
+3. **調査フェーズ** — 専門エージェント（スペシャリスト）が概要を読み取り、それぞれ独自の分析（Tavily を介した Web 検索など）を実行し、型定義された JSON を出力します。依存関係が許す限り、エージェントは並行して動作します。
+4. **統合 & 監査フェーズ** — 統合エージェントが結果を集約し、クリティカルレビューエージェントが「楽観バイアス」や「論理の飛躍」がないかを監査します。
+5. **意思決定フェーズ** — ユーザーがダッシュボードを確認し、「Go / Conditional Go / NoGo / Hold」を選択します。
+6. **アクションフェーズ** — 「Go」の場合、システムは初期の実装タスクをプロジェクトトラッカー（将来的に GitHub Projects V2）に登録します。
 
-## Agent roster (specialists)
+## エージェント一覧（スペシャリスト）
 
-(Detailed schemas are TBD in design — see `docs/architecture/overview.md`.)
+（詳細なスキーマは設計段階で決定されます — `docs/architecture/overview.md` を参照してください。）
 
-- Competitor / substitution analysis (includes "is this just ChatGPT?" risk).
-- Market sizing & TAM/SAM/SOM sanity check.
-- Customer-problem severity (YC "hair on fire" framing).
-- Technical feasibility & build-time estimate.
-- Monetization / unit economics.
-- Regulatory / compliance risk.
+- **競合 / 代替分析**（「これは単なる ChatGPT ではないか？」というリスク評価を含む）。
+- **市場規模 & TAM/SAM/SOM** の現実的な検証。
+- **顧客の課題の深刻度**（YC の「髪に火がついている状態 (hair on fire)」のフレーミング）。
+- **技術的実現可能性 & 開発期間**の見積もり。
+- **マネタイズ / ユニットエコノミクス**。
+- **法規制 / コンプライアンス**のリスク。
 
-Plus:
-- **Integration agent** — assembles the report.
-- **Critical reviewer** — final audit, deliberately skeptical tone.
+さらに：
+- **統合エージェント (Integration agent)** — レポートを組み立てます。
+- **クリティカルレビュアー (Critical reviewer)** — 意図的に懐疑的なトーンで最終監査を行います。
 
-## Schema fragment (verbatim from the spec)
+## スキーマの断片（仕様書からの抜粋）
 
-One specialist's output schema, illustrating the contract style:
+コントラクトのスタイルを示す、あるスペシャリストの出力スキーマの例：
 
 ```json
 {
@@ -99,52 +82,47 @@ One specialist's output schema, illustrating the contract style:
 }
 ```
 
-## Cost & ops notes
+## コスト & 運用に関する注意事項
 
-- **Context rebilling.** Naive multi-agent pipelines spend up to ~4.8× a
-  single-model run because each agent re-pays for prior context. Mitigations:
-  - Pass extracted JSON, not full conversation history ("entity memory").
-  - Use Anthropic prompt caching for shared system prompts.
-  - Route cheap extraction to GPT-4o-mini; reserve Claude Sonnet for
-    integration and review.
-- Cap iterations per node in LangGraph (`max_iterations ≈ 3`) so a search
-  miss can't trigger an infinite retry loop.
+- **コンテキストの再課金。** 単純なマルチエージェントパイプラインでは、各エージェントが過去のコンテキストに再度支払うため、単一モデル実行の最大 4.8 倍のコストがかかる可能性があります。対策：
+  - 会話履歴全体ではなく、抽出された JSON のみを渡します（「エンティティメモリ」）。
+  - 共有システムプロンプトには Anthropic のプロンプトキャッシュを使用します。
+  - 安価な抽出タスクには GPT-4o-mini を割り当て、統合とレビューには Claude Sonnet を確保します。
+- LangGraph の各ノードでのイテレーション数を制限します（`max_iterations ≈ 3`）。これにより、検索漏れによって無限のリトライループが発生するのを防ぎます。
 
-## Failure modes & mitigations
+## 失敗モードと対策
 
-| Failure | Cause | Mitigation |
+| 失敗モード | 原因 | 対策 |
 |---|---|---|
-| "Yes-man" output | RLHF reward for pleasing the user | Independent critical reviewer at the end, deliberately strict tone |
-| Fabricated market sizes | Hallucination filling for missing search results | Forbid emitting numbers without a source URL in prompts; split extraction from generation |
-| API cost runaway | Search returns nothing useful → retry loop | Hard cap iterations per node |
-| Unactionable report | Concatenated agent outputs | Integration agent's job is "extract the Go/NoGo axes", not summarize |
+| ユーザーに同調する「イエスマン」出力 | ユーザーを喜ばせるための RLHF 報酬 | 最後に独立したクリティカルレビュアーを配置し、意図的に厳格なトーンで評価 |
+| 捏造された市場規模 | 検索結果不足を補うためのハルシネーション | プロンプトでソース URL のない数値の出力を禁止。抽出と生成を分割する |
+| API コストの暴走 | 検索で有用な情報が得られないことによるリトライループ | ノードあたりのイテレーション数をハード制限 |
+| 実用に適さないレポート | 単にエージェントの出力を連結したもの | 統合エージェントの役割を「要約」ではなく「Go/NoGo の軸の抽出」とする |
 
-## Roadmap (initial 2 weeks)
+## ロードマップ（初期の2週間）
 
-**Week 1 — backend & core logic**
-- Day 1–2: LangGraph environment, Supabase schema, Tavily account.
-- Day 3–4: 6 agent prompts + Pydantic output schemas.
-- Day 5–6: Sequential DAG in LangGraph; smoke-test with a fixed idea string.
-- Day 7: FastAPI endpoints, timeout/error handling.
+**第1週 — バックエンド & コアロジック**
+- 1〜2日目：LangGraph 環境の構築、Supabase スキーマの作成、Tavily アカウントの設定。
+- 3〜4日目：6つのエージェントのプロンプト + Pydantic 出力スキーマの作成。
+- 5〜6日目：LangGraph での順次 DAG の構築。固定のアイデア文字列を使用した疎通確認テスト。
+- 7日目：FastAPI エンドポイント、タイムアウト/エラーハンドリングの実装。
 
-**Week 2 — frontend & integration**
-- Day 8–9: Next.js scaffold, Supabase client.
-- Day 10–11: Idea input + progress UI.
-- Day 12–13: Report dashboard (Markdown + charts), Go/NoGo buttons writing
-  back to the DB.
-- Day 14: E2E test, prompt tuning, deploy to Vercel + Render.
+**第2週 — フロントエンド & 統合**
+- 8〜9日目：Next.js の雛形作成、Supabase クライアントの実装。
+- 10〜11日目：アイデア入力 + 進捗表示 UI の実装。
+- 12〜13日目：レポートダッシュボード（Markdown + チャート）の実装、DB に書き戻す Go/NoGo ボタンの実装。
+- 14日目：E2E テスト、プロンプト調整、Vercel + Render へのデプロイ。
 
-## Future extensions (post-MVP)
+## 将来の拡張機能（MVP以降）
 
-- GitHub Projects V2 GraphQL integration (auto-file MVP issues on Go).
-- Interview-script generation on Conditional Go.
-- pgvector-backed RAG over past NoGo'd ideas to surface "same failure
-  pattern as idea X" warnings.
+- GitHub Projects V2 GraphQL 連携（「Go」判定時に MVP のイシューを自動起票）。
+- 「Conditional Go」判定時のインタビューシート自動生成。
+- 過去に NoGo 判定されたアイデアに対する pgvector を活用した RAG により、「アイデア X と同様の失敗パターン」の警告を表示。
 
-## References
+## 参照 (References)
 
-- LangGraph docs (state machine + interrupt patterns)
+- LangGraph ドキュメント (state machine + interrupt patterns)
 - CrewAI Sequential/Hierarchical (role design patterns)
-- OpenAI Structured Outputs guide
+- OpenAI Structured Outputs ガイド
 - GitHub Projects V2 GraphQL API
 - Y Combinator Startup School ("hair on fire problem")

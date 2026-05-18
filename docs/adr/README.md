@@ -1,25 +1,21 @@
-# Architecture Decision Records
+# アーキテクチャ意思決定記録 (Architecture Decision Records)
 
-A decision belongs here if it took more than a paragraph of discussion to
-settle, will surprise a future contributor, or constrains future code.
+決定に至るまでに1段落以上の議論が必要であったもの、将来のコントリビューターが驚くようなもの、あるいは将来のコードを制約するような決定事項は、ここに記録します。
 
-## Conventions
+## 規約 (Conventions)
 
-- Filename: `NNNN-kebab-case-title.md` with a zero-padded sequence number.
-- Status lifecycle: `Proposed` → `Accepted` | `Rejected`. Once `Accepted`, an
-  ADR is immutable. To change course, write a new ADR with status `Accepted`
-  and `Supersedes: NNNN`, and edit the old one's status to
-  `Superseded by: MMMM` (the only allowed mutation).
-- Keep them short — one screen is the target.
-- Use `_template.md` to start.
+- ファイル名: `NNNN-kebab-case-title.md` (ゼロ埋めされた連番を使用)。
+- ステータスのライフサイクル: `Proposed`（提案中） → `Accepted`（承認済み） | `Rejected`（却下）。一度 `Accepted` になった ADR は不変です。方針を変更する場合は、ステータスを `Accepted`、`Supersedes: NNNN`（NNNN を上書き）とした新しい ADR を作成し、古い ADR のステータスを `Superseded by: MMMM`（MMMM により上書き）（これが唯一許可される変更です）に更新します。
+- 簡潔に保つこと — 1画面に収まる程度を目標とします。
+- 開始時は `_template.md` を使用してください。
 
-## Index
+## インデックス (Index)
 
-| #    | Title                                       | Status   |
+| #    | タイトル                                       | ステータス   |
 |------|---------------------------------------------|----------|
-| 0001 | Claude designs, Codex implements            | Accepted |
-| 0002 | One task per git worktree                   | Accepted |
-| 0003 | Task spec format                            | Accepted |
-| 0004 | App lifecycle via dev-server contract       | Accepted |
-| 0005 | Parallel execution via shell, not a daemon  | Accepted |
-| 0006 | Harness execution surface split             | Accepted |
+| 0001 | Claudeが設計し、Codexが実装する            | Accepted |
+| 0002 | 1つのgitワークツリーにつき1つのタスク       | Accepted |
+| 0003 | タスク仕様のフォーマット                    | Accepted |
+| 0004 | dev-server コントラクトを介したアプリのライフサイクル | Accepted |
+| 0005 | デーモンではなくシェルを介した並行実行      | Accepted |
+| 0006 | Webとローカル環境間でのハーネス実行の分割   | Accepted |

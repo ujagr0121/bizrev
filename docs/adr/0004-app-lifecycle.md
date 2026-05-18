@@ -1,62 +1,50 @@
-# 0004 — App lifecycle via dev-server contract
+# 0004 — dev-server コントラクトを介したアプリのライフサイクル
 
-- **Status:** Accepted
-- **Date:** 2026-05-16
-- **Deciders:** project owner
+- **ステータス:** 承認済み (Accepted)
+- **日付:** 2026-05-16
+- **決定者:** プロジェクトオーナー (project owner)
 
-## Context
+## 背景 (Context)
 
-Reviewing a real feature usually means clicking around in the running app, not
-reading diffs. We want `scripts/bizrev review <id>` to bring the right dev
-server up on the right port and report the URL — without each task hand-coding
-that orchestration.
+実際の機能をレビューする場合、通常は差分（diff）を読むことではなく、実行中のアプリをクリックして確認することを意味します。各タスクが開発サーバー起動のオーケストレーションを個別にハードコーディングすることなく、`scripts/bizrev review <id>` が適切な開発サーバーを適切なポートで起動し、その URL を報告できるようにしたいと考えています。
 
-## Decision
+## 意思決定 (Decision)
 
-Every task that produces a runnable surface declares it in `task.md`'s
-front-matter under `app:`:
+実行可能なインターフェースを生成するすべてのタスクは、`task.md` のフロントマターで `app:` の下にその旨を宣言します：
 
 ```yaml
 app:
-  cmd: "make -C backend dev"   # foreground command
-  port: 8001                   # port to allocate
-  health: "http://localhost:8001/healthz"   # optional health check
+  cmd: "make -C backend dev"   # フォアグラウンドコマンド
+  port: 8001                   # 割り当てるポート
+  health: "http://localhost:8001/healthz"   # 任意のヘルスチェック
 ```
 
-`scripts/bizrev app up <id>` then:
+これに基づき、`scripts/bizrev app up <id>` は以下の処理を行います：
 
-1. cds into the task's worktree.
-2. Reads `app.cmd` / `app.port` from `task.md` front-matter.
-3. Exports `PORT=<port>` and any `--env` flags passed.
-4. Runs `app.cmd` in the background, captures stdout/stderr to
-   `.bizrev/logs/<id>.log`, writes pid to `.bizrev/pids/<id>.pid`.
-5. If `app.health` is set, polls it until 200 OK (timeout 60s).
-6. Prints `Ready: http://localhost:<port>` or the failure log path.
+1. タスクのワークツリーに `cd` します。
+2. `task.md` のフロントマターから `app.cmd` / `app.port` を読み取ります。
+3. `PORT=<port>` および渡されたすべての `--env` フラグをエクスポートします。
+4. バックグラウンドで `app.cmd` を実行し、標準出力/標準エラー出力を `.bizrev/logs/<id>.log` にキャプチャし、プロセスIDを `.bizrev/pids/<id>.pid` に書き込みます。
+5. `app.health` が設定されている場合、200 OK になるまでポーリングします（タイムアウト 60 秒）。
+6. `Ready: http://localhost:<port>` または失敗ログのパスを出力します。
 
-`scripts/bizrev app down <id>` kills the pid and removes the pid file.
-`scripts/bizrev app status` lists everything running.
+`scripts/bizrev app down <id>` は、プロセスID（pid）をキルして pid ファイルを削除します。
+`scripts/bizrev app status` は、起動中のすべてのアプリをリスト表示します。
 
-For multi-process tasks (FastAPI + Next.js), the convention is **one Makefile
-target per task** that wires up both. The Makefile lives in the worktree, so
-Codex owns it.
+マルチプロセスを伴うタスク（FastAPI + Next.js など）の場合、慣例として**タスクごとに1つの Makefile ターゲット**を定義して両方を接続します。Makefile はワークツリー内に存在するため、Codex がそれを管理します。
 
-## Consequences
+## 結果 (Consequences)
 
-- Tasks that don't have a runnable surface (e.g. "add a Pydantic model") set
-  `app.cmd: null` and the reviewer skips the app-up step.
-- Port collisions are avoided by allocating per task — see ADR-0002 (worktree
-  isolation) and `scripts/lib/ports.sh`.
-- We can extend later (Docker Compose per task, etc.) by changing only the
-  harness; the `app:` contract stays.
+- 実行可能なインターフェースを持たないタスク（例: 「Pydantic モデルの追加」）は `app.cmd: null` に設定し、レビュアーはアプリの起動ステップをスキップします。
+- タスクごとにポートを割り当てることで、ポートの衝突を回避します — ADR-0002（ワークツリーの分離）および `scripts/lib/ports.sh` を参照してください。
+- 将来的には、ハーネスのみを変更することで拡張可能です（タスクごとの Docker Compose など）。`app:` のコントラクト自体は維持されます。
 
-## Alternatives considered
+## 代替案の検討 (Alternatives considered)
 
-- **Hard-coded ports per service.** Rejected — collides as soon as two tasks
-  run simultaneously.
-- **Process supervisor (Honcho/Procfile).** Rejected for MVP — extra dep for
-  no current benefit. The Makefile-per-task convention is enough.
+- **サービスごとの固定ポート。** 却下 — 2つのタスクが同時に実行されるとすぐに衝突するため。
+- **プロセススーパーバイザー (Honcho/Procfile)。** MVP の段階では却下 — 現時点ではメリットがなく不要な依存関係が増えるため。タスクごとの Makefile ターゲットの慣例だけで十分です。
 
-## References
+## 参照 (References)
 
 - `scripts/app.sh`
 - `tasks/_template/task.md`

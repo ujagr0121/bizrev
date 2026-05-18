@@ -1,57 +1,41 @@
-# 0001 — Claude designs, Codex implements
+# 0001 — Claudeが設計し、Codexが実装する
 
-- **Status:** Accepted
-- **Date:** 2026-05-16
-- **Deciders:** project owner
+- **ステータス:** 承認済み (Accepted)
+- **日付:** 2026-05-16
+- **決定者:** プロジェクトオーナー (project owner)
 
-## Context
+## 背景 (Context)
 
-We need a workflow that uses two complementary AI tools without them stepping
-on each other:
+互いに干渉し合うことなく、相補的な2つのAIツールを使用するワークフローが必要です：
 
-- Claude Code is strong at design, multi-file reasoning, and reviewing tradeoffs.
-- Codex CLI is strong at carrying out a well-specified implementation task.
+- Claude Codeは、設計、複数ファイルにまたがる推論、およびトレードオフの評価に優れています。
+- Codex CLIは、明確に指定された実装タスクの実行に優れています。
 
-Letting either tool do "all of it" hurts: Claude is expensive for bulk
-implementation and slower to converge on long edit sequences; Codex left to
-its own devices on an under-specified brief tends to invent scope.
+どちらか一方のツールに「すべて」を行わせることは弊害があります。Claudeは大量の実装を行うにはコストが高く、長い編集シーケンスの収束が遅いです。また、Codexに十分に仕様化されていない概要を任せると、勝手にスコープを捏造する傾向があります。
 
-## Decision
+## 意思決定 (Decision)
 
-We split responsibilities by role, enforced by both `CLAUDE.md` and
-`AGENTS.md`:
+`CLAUDE.md` と `AGENTS.md` の両方によって強制される形で、役割ごとに責任を分割します：
 
-- **Claude** owns: requirements clarification, architecture, task breakdown,
-  acceptance criteria, code review, ADR authoring, and orchestration of the
-  Codex calls via `scripts/bizrev`.
-- **Codex** owns: writing application code in a worktree, running tests
-  locally, and committing on the task branch.
-- The human owns: final Go/NoGo on designs, ADRs, and PRs.
+- **Claude**が所有するもの：要件の明確化、アーキテクチャ、タスク分解、受け入れ基準、コードレビュー、ADRの作成、および `scripts/bizrev` を介したCodex呼び出しのオーケストレーション。
+- **Codex**が所有するもの：ワークツリーでのアプリケーションコードの記述、ローカルでのテスト実行、およびタスクブランチへのコミット。
+- 人間（ユーザー）が所有するもの：設計、ADR、およびPRの最終的な承認（Go/NoGo）。
 
-Claude must not edit files under `backend/`, `frontend/`, or `infra/` directly
-(except to bootstrap an empty skeleton when explicitly asked). Codex must not
-edit files under `.claude/`, `docs/adr/`, `scripts/`, or `tasks/_template/`.
+Claudeは、`backend/`、`frontend/`、または `infra/` 配下のファイルを直接編集してはなりません（明示的に要求された際に空の骨組みをブートストラップする場合を除く）。Codexは、`.claude/`、`docs/adr/`、`scripts/`、または `tasks/_template/` 配下のファイルを編集してはなりません。
 
-## Consequences
+## 結果 (Consequences)
 
-- Every implementation lives behind a Codex invocation, giving us a clean
-  log of "what was Codex asked to do, on what input, and what did it produce."
-- The task spec format becomes load-bearing (see ADR-0003) because it is
-  Codex's entire briefing.
-- Code review is genuinely independent — Claude reviews work it didn't write.
-- We accept some friction on tiny edits (a one-line typo fix goes through the
-  same pipeline). The harness keeps that overhead low; we prefer consistency
-  to a fast path that erodes over time.
+- すべての実装はCodexの呼び出しによって行われ、「Codexがどの入力に対して何を求められ、何を生成したか」というクリーンなログが残ります。
+- タスク仕様フォーマット（ADR-0003を参照）はCodexへのブリーフィング全体となるため、非常に重要になります。
+- コードレビューが真に独立したものになります — Claudeは自分が書いていないコードをレビューします。
+- 小さな修正における多少 of オーバーヘッド（1行のタイポ修正も同じパイプラインを通る）は許容します。ハーネスはそのオーバーヘッドを低く保ちます。時間経過とともに損なわれる可能性のあるショートカットよりも、一貫性を優先します。
 
-## Alternatives considered
+## 代替案の検討 (Alternatives considered)
 
-- **Single tool end-to-end.** Rejected — loses the design/implement separation
-  and the audit trail.
-- **Claude implements, Codex reviews.** Rejected — Codex's review output is
-  less useful than Claude's, and Claude is more expensive per implementation
-  token.
+- **単一ツールによるエンドツーエンド。** 却下 — 設計と実装 of 分離、および監査トレイルが失われるため。
+- **Claudeが実装し、Codexがレビューする。** 却下 — Codexのレビュー出力はClaudeのものほど有用ではなく、実装トークンあたりのClaudeのコストが高いため。
 
-## References
+## 参照 (References)
 
-- `CLAUDE.md`, `AGENTS.md`
-- `scripts/bizrev` (`implement` subcommand)
+- `CLAUDE.md`、`AGENTS.md`
+- `scripts/bizrev` (`implement` サブコマンド)

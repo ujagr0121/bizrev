@@ -1,29 +1,28 @@
-# NNNN — short imperative title
+# NNNN — 簡潔な命令調のタイトル
 
-- **Status:** Proposed | Accepted | Rejected | Superseded by ADR-MMMM
-- **Date:** YYYY-MM-DD
-- **Deciders:** names / handles
+- **ステータス:** Proposed | Accepted | Rejected | Superseded by ADR-MMMM
+- **日付:** YYYY-MM-DD
+- **決定者:** 名前 / ハンドル名
 
-## Context
+## 背景 (Context)
 
-What is the problem? What forces are in play (cost, time, team, prior art)?
-What did we already try or rule out? Keep it factual; this paragraph should
-let a new reader catch up without DMing anyone.
+何が課題ですか？どのような要素（コスト、時間、チーム、既存技術など）が影響していますか？
+これまでに試したことや排除した選択肢は何ですか？事実のみを記述してください。この段落を読むだけで、新規の読者が誰かに直接問い合わせることなく背景を理解できるようにします。
 
-## Decision
+## 意思決定 (Decision)
 
-The actual call, stated as an imperative: "We will X." One or two sentences.
+命令調で記述された具体的な決定事項：「私たちはXを行います。」1〜2文で記述します。
 
-## Consequences
+## 結果 (Consequences)
 
-What does this make easier? Harder? What new obligations does it create
-(tests, docs, monitoring)? What does it foreclose?
+これにより何が容易になりますか？何が困難になりますか？どのような新しい義務（テスト、ドキュメント、監視など）が生じますか？
+どのような選択肢が排除されますか？
 
-## Alternatives considered
+## 代替案の検討 (Alternatives considered)
 
-- **Option A** — why not.
-- **Option B** — why not.
+- **選択肢 A** — 採用しなかった理由。
+- **選択肢 B** — 採用しなかった理由。
 
-## References
+## 参照 (References)
 
-Links to PRs, issues, prior ADRs, external docs.
+PR、イシュー、以前の ADR、外部ドキュメントへのリンク。
